@@ -73,13 +73,8 @@ description of the parameters below.
 
 | Name | Description |
 | :----------------------: | :-----------------------------: |
-| `triton_backend` | The backend to use for the model. Set to `tensorrtllm` to utilize the C++ TRT-LLM backend implementation. Set to `python` to utlize the TRT-LLM Python runtime. |
 | `triton_max_batch_size` | The maximum batch size that the Triton model instance will run with. Note that for the `tensorrt_llm` model, the actual runtime batch size can be larger than `triton_max_batch_size`. The runtime batch size will be determined by the TRT-LLM scheduler based on a number of parameters such as number of available requests in the queue, and the engine build `trtllm-build` parameters (such `max_num_tokens` and `max_batch_size`). |
-| `decoupled_mode` | Whether to use decoupled mode. Must be set to `true` for requests setting the `stream` tensor to `true`. |
-| `max_queue_delay_microseconds` | The maximum queue delay in microseconds. Setting this parameter to a value greater than 0 can improve the chances that two requests arriving within `max_queue_delay_microseconds` will be scheduled in the same TRT-LLM iteration. |
-| `max_queue_size` | The maximum number of requests allowed in the TRT-LLM queue before rejecting new requests. |
 | `engine_dir` | The path to the engine for the model. |
-| `batching_strategy` | The batching strategy to use. Set to `inflight_fused_batching` when enabling in-flight batching support. To disable in-flight batching, set to `V1` |
 
 *Optional parameters*
 
@@ -87,6 +82,11 @@ description of the parameters below.
 
 | Name | Description |
 | :----------------------: | :-----------------------------: |
+| `decoupled_mode` | Whether to use decoupled mode. Must be set to `true` for requests setting the `stream` tensor to `true`. Defaults to ??. |
+| `max_queue_delay_microseconds` | The maximum queue delay in microseconds. Setting this parameter to a value greater than 0 can improve the chances that two requests arriving within `max_queue_delay_microseconds` will be scheduled in the same TRT-LLM iteration. Defaults to ??. |
+| `max_queue_size` | The maximum number of requests allowed in the TRT-LLM queue before rejecting new requests. Defaults to ??. |
+| `batching_strategy` | The batching strategy to use. Set to `inflight_fused_batching` when enabling in-flight batching support. To disable in-flight batching, set to `V1`. Defaults to `inflight_fused_batching`.|
+
 | `encoder_engine_dir` | When running encoder-decoder models, this is the path to the folder that contains the model configuration and engine for the encoder model. |
 | `max_attention_window_size` | When using techniques like sliding window attention, the maximum number of tokens that are attended to generate one token. Defaults attends to all tokens in sequence. (default=max_sequence_length) |
 | `sink_token_length` | Number of sink tokens to always keep in attention window. |
@@ -114,8 +114,8 @@ additional benefits.
 | `max_tokens_in_paged_kv_cache` | The maximum size of the KV cache in number of tokens. If unspecified, value is interpreted as 'infinite'. KV cache allocation is the min of max_tokens_in_paged_kv_cache and value derived from kv_cache_free_gpu_mem_fraction below. (default=unspecified) |
 | `kv_cache_free_gpu_mem_fraction` | Set to a number between 0 and 1 to indicate the maximum fraction of GPU memory (after loading the model) that may be used for KV cache. (default=0.9) |
 | `cross_kv_cache_fraction` | Set to a number between 0 and 1 to indicate the maximum fraction of KV cache that may be used for cross attention, and the rest will be used for self attention. Optional param and should be set for encoder-decoder models ONLY. (default=0.5) |
-| `kv_cache_host_memory_bytes` |  Enable offloading to host memory for the given byte size. |
-| `enable_kv_cache_reuse` | Set to `true` to reuse previously computed KV cache values (e.g. for system prompt) |
+| `kv_cache_host_memory_bytes` |  Enable offloading to host memory for the given byte size. Defaults to 0. |
+| `enable_kv_cache_reuse` | Set to `true` to reuse previously computed KV cache values (e.g. for system prompt). Defaults to `true`. |
 
 - LoRA cache
 
@@ -131,7 +131,7 @@ additional benefits.
 | Name | Description |
 | :----------------------: | :-----------------------------: |
 | `max_beam_width` | The beam width value of requests that will be sent to the executor. (default=1) |
-| `decoding_mode` | Set to one of the following: `{top_k, top_p, top_k_top_p, beam_search, medusa}` to select the decoding mode. The `top_k` mode exclusively uses Top-K algorithm for sampling, The `top_p` mode uses exclusively Top-P algorithm for sampling. The top_k_top_p mode employs both Top-K and Top-P algorithms, depending on the runtime sampling params of the request. Note that the `top_k_top_p option` requires more memory and has a longer runtime than using `top_k` or `top_p` individually; therefore, it should be used only when necessary. `beam_search` uses beam search algorithm. If not specified, the default is to use `top_k_top_p` if `max_beam_width == 1`; otherwise, `beam_search` is used. When Medusa model is used, `medusa` decoding mode should be set. However, TensorRT-LLM detects loaded Medusa model and overwrites decoding mode to `medusa` with warning. |
+| `decoding_mode` | Set to one of the following: `{top_k, top_p, top_k_top_p, beam_search, medusa}` to select the decoding mode. The `top_k` mode exclusively uses Top-K algorithm for sampling, The `top_p` mode uses exclusively Top-P algorithm for sampling. The top_k_top_p mode employs both Top-K and Top-P algorithms, depending on the runtime sampling params of the request. Note that the `top_k_top_p option` requires more memory and has a longer runtime than using `top_k` or `top_p` individually; therefore, it should be used only when necessary. `beam_search` uses beam search algorithm. If not specified, the default is to use `top_k_top_p` if `max_beam_width == 1`; otherwise, `beam_search` is used. When Medusa model is used, `medusa` decoding mode should be set. However, TensorRT-LLM detects loaded Medusa model and overwrites decoding mode to `medusa` with warning. Defaults to ?? |
 
 - Optimization
 
@@ -149,7 +149,7 @@ additional benefits.
 
 | Name | Description |
 | :----------------------: | :-----------------------------: |
-| `medusa_choices` | To specify Medusa choices tree in the format of e.g. "{0, 0, 0}, {0, 1}". By default, `mc_sim_7b_63` choices are used. |
+| `medusa_choices` | To specify Medusa choices tree in the format of e.g. "{0, 0, 0}, {0, 1}". By default, `mc_sim_7b_63` choices are used. (Why do I need to specify here AND in decoding mode) |
 
 ### tensorrt_llm_bls model
 
@@ -162,7 +162,6 @@ to learn more about BLS models.
 | Name | Description |
 | :----------------------: | :-----------------------------: |
 | `triton_max_batch_size` | The maximum batch size that the model can handle. |
-| `decoupled_mode` | Whether to use decoupled mode. |
 | `bls_instance_count` | The number of instances of the model to run. When using the BLS model instead of the ensemble, you should set the number of model instances to the maximum batch size supported by the TRT engine to allow concurrent request execution. |
 
 *Optional parameters*
@@ -171,9 +170,10 @@ to learn more about BLS models.
 
 | Name | Description |
 | :----------------------: | :-----------------------------: |
+| `decoupled_mode` | Whether to use decoupled mode. Defaults to ??. |
 | `accumulate_tokens` | Used in the streaming mode to call the postprocessing model with all accumulated tokens, instead of only one token. This might be necessary for certain tokenizers. |
 
-- Speculative decoding
+- Speculative decoding -- Why is this specified here and above?
 
 The BLS model supports speculative decoding. Target and draft triton models are set with the parameters `tensorrt_llm_model_name` `tensorrt_llm_draft_model_name`. Speculative decodingis performed by setting `num_draft_tokens` in the request.  `use_draft_logits` may be set to use logits comparison speculative decoding. Note that `return_generation_logits` and `return_context_logits` are not supported when using speculative decoding. Also note that requests with batch size greater than 1 is not supported with speculative decoding right now.
 
